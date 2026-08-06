@@ -109,6 +109,18 @@ def load_snipers(guild_id):
     response = supabase.table("snipers").select("*").eq("guild_id", guild_id).execute()
     return {row["display_name"]: row["aoe4_id"] for row in response.data}
 
+def add_sniper(guild_id, display_name, aoe4_id):
+    """新增狙擊手玩家"""
+    supabase.table("snipers").upsert({
+        "guild_id": guild_id,
+        "display_name": display_name,
+        "aoe4_id": aoe4_id
+    }).execute()
+
+def delete_sniper(guild_id, display_name):
+    """刪除狙擊手玩家"""
+    supabase.table("snipers").delete().eq("guild_id", guild_id).eq("display_name", display_name).execute()
+
 # ---- 文明 / 排位翻譯 ----
 CIV_MAPPING = {
     "byzantines": "拜占庭",
@@ -278,6 +290,63 @@ async def set_channel(interaction: discord.Interaction, 頻道: discord.TextChan
     save_guild_config(guild_id, 頻道.id)
     await interaction.response.send_message(f"成功將每日自動發送排行榜的頻道設定為：{頻道.mention}")
 
+# ---- /新增狙擊手 ----
+@bot.tree.command(name="新增狙擊手", description="新增一名狙擊手（管理員專用）")
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(名稱="狙擊手的顯示名稱", aoe4_id="AoE4 World 純數字 ID")
+async def add_sniper_cmd(interaction: discord.Interaction, 名稱: str, aoe4_id: str):
+    await interaction.response.defer(ephemeral=True)
+
+    guild_id = str(interaction.guild_id)
+
+    # 驗證 AoE4 ID
+    api_url = f"https://aoe4world.com/api/v0/players/{aoe4_id}"
+    response = requests.get(api_url)
+    if response.status_code != 200:
+        await interaction.followup.send(f" 找不到 AoE4 World ID: `{aoe4_id}`，請檢查數字是否正確！")
+        return
+
+    player_name = response.json().get("name", "未知玩家")
+    add_sniper(guild_id, 名稱, aoe4_id)
+
+    await interaction.followup.send(
+        f"✅ 已新增狙擊手 **{名稱}**：**{player_name}** (ID: {aoe4_id})"
+    )
+
+# ---- /刪除狙擊手 ----
+@bot.tree.command(name="刪除狙擊手", description="刪除一名狙擊手（管理員專用）")
+@app_commands.checks.has_permissions(manage_guild=True)
+@app_commands.describe(名稱="狙擊手的顯示名稱")
+async def delete_sniper_cmd(interaction: discord.Interaction, 名稱: str):
+    await interaction.response.defer(ephemeral=True)
+
+    guild_id = str(interaction.guild_id)
+    snipers_dict = load_snipers(guild_id)
+
+    if 名稱 not in snipers_dict:
+        await interaction.followup.send(f"❌ 找不到名為 **{名稱}** 的狙擊手。")
+        return
+
+    delete_sniper(guild_id, 名稱)
+    await interaction.followup.send(f"🗑️ 已刪除狙擊手 **{名稱}**。")
+
+# ---- /狙擊手列表 ----
+@bot.tree.command(name="狙擊手列表", description="列出本伺服器所有狙擊手")
+async def sniper_list(interaction: discord.Interaction):
+    await interaction.response.defer()
+
+    guild_id = str(interaction.guild_id)
+    snipers_dict = load_snipers(guild_id)
+
+    if not snipers_dict:
+        await interaction.followup.send("ℹ️ 目前本伺服器尚未有任何狙擊手資料。")
+        return
+
+    lines = ["**📋 狙擊手名單**\n"]
+    for name, pid in snipers_dict.items():
+        lines.append(f"- **{name}** (ID: {pid})")
+    await interaction.followup.send("\n".join(lines))
+
 # ---- /天梯 ----
 @bot.tree.command(name="天梯", description="顯示目前伺服器已綁定玩家的天梯排行榜")
 @app_commands.choices(模式=[
@@ -322,6 +391,18 @@ async def leaderboard(interaction: discord.Interaction, 模式: app_commands.Cho
         await interaction.followup.send(f"{heading}\n{content}")
     else:
         await interaction.followup.send("ℹ️ 本伺服器目前無天梯分數數據。")
+
+# ---- 權限錯誤處理 ----
+@bot.tree.error
+async def on_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message(
+            "❌ 你沒有權限使用這個指令（需要管理伺服器權限）。", ephemeral=True
+        )
+    else:
+        await interaction.response.send_message(
+            f"⚠️ 指令執行時發生錯誤：{error}", ephemeral=True
+        )
 
 # ---- 啟動 ----
 bot.run(os.getenv("DISCORD_TOKEN"))
