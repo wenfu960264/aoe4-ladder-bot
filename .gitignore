@@ -1,0 +1,60 @@
+# 環境變數設定檔
+.env
+
+# Discord Bot Token（緊急時可額外包含）
+*.token
+*.secret
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虛擬環境
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 資料檔案
+players.txt
+
+# Claude Code
+.claude/
+
+# 舊版本
+version/
+
+# 工作區設定
+*.code-workspace
+
+# 圖片
+*.png
+
+# OS
+.DS_Store
+Thumbs.db
