@@ -8,21 +8,15 @@ import datetime
 import threading
 from flask import Flask
 from dotenv import load_dotenv
+from supabase import create_client, Client
 
 load_dotenv()
 
-# ---- Supabase 連線（可選） ----
+# ---- Supabase 連線 ----
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-USE_SUPABASE = bool(SUPABASE_URL and SUPABASE_KEY)
-
-if USE_SUPABASE:
-    from supabase import create_client, Client
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ 使用 Supabase 儲存資料")
-else:
-    print("⚠️ 未設定 Supabase，使用本地 players.txt")
-    DATA_FILE = "players.txt"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+print("✅ 使用 Supabase 儲存資料")
 
 # ---- 健康檢查端點（供 UptimeRobot ping） ----
 app = Flask(__name__)
@@ -56,63 +50,64 @@ class AoE4Bot(commands.Bot):
     @tasks.loop(time=AUTO_SEND_TIME)
     async def daily_leaderboard_loop(self):
         print("🕒 定時觸發：正在為各個伺服器生成詳細排行榜...")
-        db = load_db()
+        guild_configs = load_guild_configs()
 
-        for guild_id_str, config in db.items():
+        for guild_id, config in guild_configs.items():
             channel_id = config.get("channel_id")
             if not channel_id:
                 continue
 
             channel = self.get_channel(int(channel_id))
             if not channel:
-                print(f"❌ 伺服器 {guild_id_str} 找不到指定的頻道 ID: {channel_id}")
+                print(f"❌ 伺服器 {guild_id} 找不到指定的頻道 ID: {channel_id}")
                 continue
 
-            players_dict = config.get("players", {})
-            if not players_dict:
-                continue
+            # 單人排位
+            players_dict = load_players(guild_id)
+            if players_dict:
+                content_solo = await fetch_detailed_leaderboard(players_dict, mode_type="rm_solo")
+                if content_solo:
+                    await channel.send(content=f"📢 **【單人排位】**\n{content_solo}")
 
-            content_solo = await fetch_detailed_leaderboard(players_dict, mode_type="rm_solo")
-            if content_solo:
-                await channel.send(content=f"📢 **【單人排位】**\n{content_solo}")
-
-            content_team = await fetch_detailed_leaderboard(players_dict, mode_type="rm_team")
-            if content_team:
-                await channel.send(content=f"📢 **【團隊排位】**\n{content_team}")
+                content_team = await fetch_detailed_leaderboard(players_dict, mode_type="rm_team")
+                if content_team:
+                    await channel.send(content=f"📢 **【團隊排位】**\n{content_team}")
 
 bot = AoE4Bot()
 
-# ---- 資料庫讀寫 ----
-def load_db():
-    if USE_SUPABASE:
-        response = supabase.table("guild_config").select("*").execute()
-        db = {}
-        for row in response.data:
-            db[row["guild_id"]] = {
-                "channel_id": row["channel_id"],
-                "players": row["players"] or {}
-            }
-        return db
-    else:
-        if os.path.exists(DATA_FILE):
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                try:
-                    return json.load(f)
-                except json.JSONDecodeError:
-                    return {}
-        return {}
+# ---- Supabase 讀寫 ----
+def load_guild_configs():
+    """讀取所有伺服器設定"""
+    response = supabase.table("guild_config").select("*").execute()
+    db = {}
+    for row in response.data:
+        db[row["guild_id"]] = {"channel_id": row["channel_id"]}
+    return db
 
-def save_db(data):
-    if USE_SUPABASE:
-        for guild_id, config in data.items():
-            supabase.table("guild_config").upsert({
-                "guild_id": guild_id,
-                "channel_id": config["channel_id"],
-                "players": config["players"]
-            }).execute()
-    else:
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
+def save_guild_config(guild_id, channel_id):
+    """儲存伺服器設定"""
+    supabase.table("guild_config").upsert({
+        "guild_id": guild_id,
+        "channel_id": channel_id
+    }).execute()
+
+def load_players(guild_id):
+    """讀取綁定玩家（單排/團戰用）"""
+    response = supabase.table("players").select("*").eq("guild_id", guild_id).execute()
+    return {row["discord_name"]: row["aoe4_id"] for row in response.data}
+
+def save_player(guild_id, discord_name, aoe4_id):
+    """儲存綁定玩家"""
+    supabase.table("players").upsert({
+        "guild_id": guild_id,
+        "discord_name": discord_name,
+        "aoe4_id": aoe4_id
+    }).execute()
+
+def load_snipers(guild_id):
+    """讀取狙擊手玩家（手動管理）"""
+    response = supabase.table("snipers").select("*").eq("guild_id", guild_id).execute()
+    return {row["display_name"]: row["aoe4_id"] for row in response.data}
 
 # ---- 文明 / 排位翻譯 ----
 CIV_MAPPING = {
@@ -265,12 +260,11 @@ async def register(interaction: discord.Interaction, aoe4_id: str):
 
     player_name = response.json().get("name", "未知玩家")
 
-    db = load_db()
-    if guild_id not in db:
-        db[guild_id] = {"channel_id": None, "players": {}}
+    # 確保 guild_config 存在
+    save_guild_config(guild_id, None)
 
-    db[guild_id]["players"][interaction.user.display_name] = aoe4_id
-    save_db(db)
+    # 儲存玩家
+    save_player(guild_id, interaction.user.display_name, aoe4_id)
 
     await interaction.followup.send(
         f"✅ 成功將 **{interaction.user.mention}** 綁定至本伺服器天梯名冊：**{player_name}** (ID: {aoe4_id})"
@@ -281,14 +275,7 @@ async def register(interaction: discord.Interaction, aoe4_id: str):
 @app_commands.checks.has_permissions(manage_channels=True)
 async def set_channel(interaction: discord.Interaction, 頻道: discord.TextChannel):
     guild_id = str(interaction.guild_id)
-    db = load_db()
-
-    if guild_id not in db:
-        db[guild_id] = {"channel_id": None, "players": {}}
-
-    db[guild_id]["channel_id"] = 頻道.id
-    save_db(db)
-
+    save_guild_config(guild_id, 頻道.id)
     await interaction.response.send_message(f"成功將每日自動發送排行榜的頻道設定為：{頻道.mention}")
 
 # ---- /天梯 ----
@@ -303,30 +290,38 @@ async def leaderboard(interaction: discord.Interaction, 模式: app_commands.Cho
     await interaction.response.defer()
 
     guild_id = str(interaction.guild_id)
-    db = load_db()
-
-    if guild_id not in db or not db[guild_id].get("players"):
-        await interaction.followup.send("ℹ️ 目前本伺服器尚未有任何玩家綁定資料。請使用 `/綁定`！")
-        return
-
     selected_mode = 模式.value if 模式 else "rm_solo"
 
     # 模式標題對應
     mode_titles = {
         "rm_solo": "單人排位",
         "rm_team": "團隊排位",
-        "sniper": "狙擊手（全部玩家單排）",
+        "sniper": "狙擊手",
     }
     mode_title = mode_titles.get(selected_mode, "天梯")
 
-    players_dict = db[guild_id]["players"]
+    # 根據模式載入不同資料來源
+    if selected_mode == "sniper":
+        players_dict = load_snipers(guild_id)
+        source_label = "狙擊手"
+    else:
+        players_dict = load_players(guild_id)
+        source_label = "綁定玩家"
+
+    if not players_dict:
+        if selected_mode == "sniper":
+            await interaction.followup.send("ℹ️ 目前本伺服器尚未有任何狙擊手資料。請在 Supabase 手動新增。")
+        else:
+            await interaction.followup.send("ℹ️ 目前本伺服器尚未有任何玩家綁定資料。請使用 `/綁定`！")
+        return
+
     content = await fetch_detailed_leaderboard(players_dict, mode_type="rm_solo" if selected_mode == "sniper" else selected_mode)
 
     if content:
         heading = f" **{mode_title}天梯榜** \n\n"
         await interaction.followup.send(f"{heading}\n{content}")
     else:
-        await interaction.followup.send("ℹ️ 本伺服器綁定的玩家目前無天梯分數數據。")
+        await interaction.followup.send("ℹ️ 本伺服器目前無天梯分數數據。")
 
 # ---- 啟動 ----
 bot.run(os.getenv("DISCORD_TOKEN"))
