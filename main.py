@@ -47,6 +47,14 @@ class AoE4Bot(commands.Bot):
         self.daily_leaderboard_loop.start()
         print("每日定時發送成功")
 
+    async def on_guild_join(self, guild):
+        # 新伺服器加入時，立即同步指令（不受 Discord 全域快取延遲影響）
+        try:
+            await self.tree.sync(guild=guild)
+            print(f"✅ 新伺服器加入，已同步指令：{guild.name} ({guild.id})")
+        except Exception as e:
+            print(f"⚠️ 同步到新伺服器 {guild.name} 失敗: {e}")
+
     @tasks.loop(time=AUTO_SEND_TIME)
     async def daily_leaderboard_loop(self):
         print("🕒 定時觸發：正在為各個伺服器生成詳細排行榜...")
