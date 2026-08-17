@@ -31,7 +31,7 @@ def run_web():
 threading.Thread(target=run_web, daemon=True).start()
 
 # ---- 設定 ----
-AUTO_SEND_TIME = datetime.time(hour=18, minute=0, second=0)
+AUTO_SEND_TIME = datetime.time(hour=6, minute=30, second=0)
 
 # ---- Bot ----
 class AoE4Bot(commands.Bot):
@@ -86,48 +86,75 @@ bot = AoE4Bot()
 # ---- Supabase 讀寫 ----
 def load_guild_configs():
     """讀取所有伺服器設定"""
-    response = supabase.table("guild_config").select("*").execute()
-    db = {}
-    for row in response.data:
-        db[row["guild_id"]] = {"channel_id": row["channel_id"]}
-    return db
+    try:
+        response = supabase.table("guild_config").select("*").execute()
+        db = {}
+        for row in response.data:
+            db[row["guild_id"]] = {"channel_id": row["channel_id"]}
+        return db
+    except Exception as e:
+        print(f"❌ 讀取伺服器設定失敗: {e}")
+        return {}
 
 def save_guild_config(guild_id, channel_id):
     """儲存伺服器設定"""
-    supabase.table("guild_config").upsert({
-        "guild_id": guild_id,
-        "channel_id": channel_id
-    }).execute()
+    try:
+        supabase.table("guild_config").upsert({
+            "guild_id": guild_id,
+            "channel_id": channel_id
+        }).execute()
+    except Exception as e:
+        print(f"❌ 儲存伺服器設定失敗: {e}")
 
 def load_players(guild_id):
     """讀取綁定玩家（單排/團戰用）"""
-    response = supabase.table("players").select("*").eq("guild_id", guild_id).execute()
-    return {row["discord_name"]: row["aoe4_id"] for row in response.data}
+    try:
+        response = supabase.table("players").select("*").eq("guild_id", guild_id).execute()
+        return {row["discord_name"]: row["aoe4_id"] for row in response.data}
+    except Exception as e:
+        print(f"❌ 讀取玩家資料失敗（guild_id={guild_id}）: {e}")
+        return {}
 
 def save_player(guild_id, discord_name, aoe4_id):
     """儲存綁定玩家"""
-    supabase.table("players").upsert({
-        "guild_id": guild_id,
-        "discord_name": discord_name,
-        "aoe4_id": aoe4_id
-    }).execute()
+    try:
+        supabase.table("players").upsert({
+            "guild_id": guild_id,
+            "discord_name": discord_name,
+            "aoe4_id": aoe4_id
+        }).execute()
+    except Exception as e:
+        print(f"❌ 儲存玩家資料失敗: {e}")
 
 def load_snipers(guild_id):
-    """讀取狙擊手玩家（手動管理）"""
-    response = supabase.table("snipers").select("*").eq("guild_id", guild_id).execute()
-    return {row["display_name"]: row["aoe4_id"] for row in response.data}
+    """讀取狙擊手玩家（手動管理）→ {display_name: [aoe4_id, ...]}"""
+    try:
+        response = supabase.table("snipers").select("*").eq("guild_id", guild_id).execute()
+        snipers: dict[str, list[str]] = {}
+        for row in response.data:
+            snipers.setdefault(row["display_name"], []).append(row["aoe4_id"])
+        return snipers
+    except Exception as e:
+        print(f"❌ 讀取狙擊手資料失敗（guild_id={guild_id}）: {e}")
+        return {}
 
 def add_sniper(guild_id, display_name, aoe4_id):
-    """新增狙擊手玩家"""
-    supabase.table("snipers").upsert({
-        "guild_id": guild_id,
-        "display_name": display_name,
-        "aoe4_id": aoe4_id
-    }).execute()
+    """新增狙擊手玩家（直接 INSERT，允许多 ID）"""
+    try:
+        supabase.table("snipers").insert({
+            "guild_id": guild_id,
+            "display_name": display_name,
+            "aoe4_id": aoe4_id
+        }).execute()
+    except Exception as e:
+        print(f"❌ 新增狙擊手失敗: {e}")
 
 def delete_sniper(guild_id, display_name):
     """刪除狙擊手玩家"""
-    supabase.table("snipers").delete().eq("guild_id", guild_id).eq("display_name", display_name).execute()
+    try:
+        supabase.table("snipers").delete().eq("guild_id", guild_id).eq("display_name", display_name).execute()
+    except Exception as e:
+        print(f"❌ 刪除狙擊手失敗: {e}")
 
 # ---- 文明 / 排位翻譯 ----
 CIV_MAPPING = {
@@ -350,9 +377,17 @@ async def sniper_list(interaction: discord.Interaction):
         await interaction.followup.send("ℹ️ 目前本伺服器尚未有任何狙擊手資料。")
         return
 
-    lines = ["**📋 狙擊手名單**\n"]
-    for name, pid in snipers_dict.items():
-        lines.append(f"- **{name}** (ID: {pid})")
+    lines = ["**📋 狙擊手名單**"]
+    for name, ids in snipers_dict.items():
+        lines.append("")
+        lines.append(f"**{name}**")
+        for aoe4_id in ids:
+            try:
+                resp = requests.get(f"https://aoe4world.com/api/v0/players/{aoe4_id}", timeout=5)
+                player_name = resp.json().get("name", f"ID:{aoe4_id}") if resp.status_code == 200 else f"ID:{aoe4_id}"
+            except Exception:
+                player_name = f"ID:{aoe4_id}"
+            lines.append(f"- [{player_name}](https://aoe4world.com/players/{aoe4_id})")
     await interaction.followup.send("\n".join(lines))
 
 # ---- /天梯 ----
@@ -360,7 +395,6 @@ async def sniper_list(interaction: discord.Interaction):
 @app_commands.choices(模式=[
     app_commands.Choice(name="單人排位 (RM Solo)", value="rm_solo"),
     app_commands.Choice(name="團隊排位 (RM Team)", value="rm_team"),
-    app_commands.Choice(name="狙擊手（全部玩家單排）", value="sniper"),
 ])
 @app_commands.describe(模式="請選擇您要查詢的排位模式（預設為單人排位）")
 async def leaderboard(interaction: discord.Interaction, 模式: app_commands.Choice[str] = None):
@@ -373,32 +407,62 @@ async def leaderboard(interaction: discord.Interaction, 模式: app_commands.Cho
     mode_titles = {
         "rm_solo": "單人排位",
         "rm_team": "團隊排位",
-        "sniper": "狙擊手",
     }
     mode_title = mode_titles.get(selected_mode, "天梯")
 
-    # 根據模式載入不同資料來源
-    if selected_mode == "sniper":
-        players_dict = load_snipers(guild_id)
-        source_label = "狙擊手"
-    else:
-        players_dict = load_players(guild_id)
-        source_label = "綁定玩家"
+    players_dict = load_players(guild_id)
 
     if not players_dict:
-        if selected_mode == "sniper":
-            await interaction.followup.send("ℹ️ 目前本伺服器尚未有任何狙擊手資料。請在 Supabase 手動新增。")
-        else:
-            await interaction.followup.send("ℹ️ 目前本伺服器尚未有任何玩家綁定資料。請使用 `/綁定`！")
+        await interaction.followup.send("ℹ️ 目前本伺服器尚未有任何玩家綁定資料。請使用 `/綁定`！")
         return
 
-    content = await fetch_detailed_leaderboard(players_dict, mode_type="rm_solo" if selected_mode == "sniper" else selected_mode)
+    content = await fetch_detailed_leaderboard(players_dict, mode_type=selected_mode)
 
     if content:
         heading = f" **{mode_title}天梯榜** \n\n"
         await interaction.followup.send(f"{heading}\n{content}")
     else:
         await interaction.followup.send("ℹ️ 本伺服器目前無天梯分數數據。")
+
+# ---- /所有天梯 ----
+@bot.tree.command(name="所有天梯", description="顯示所有伺服器的狙擊手排行榜（管理員專用）")
+@app_commands.checks.has_permissions(manage_guild=True)
+async def all_leaderboard(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
+    guild_configs = load_guild_configs()
+    if not guild_configs:
+        await interaction.followup.send("ℹ️ 目前沒有任何伺服器註冊在系統中。")
+        return
+
+    parts = []
+    for guild_id, config in guild_configs.items():
+        snipers_dict = load_snipers(guild_id)
+        if not snipers_dict:
+            continue
+        players_dict = {name: aoe4_id for name, ids in snipers_dict.items() for aoe4_id in ids}
+        content = await fetch_detailed_leaderboard(players_dict, mode_type="rm_solo")
+        if content:
+            guild_name = "未知伺服器"
+            try:
+                guild = bot.get_guild(int(guild_id))
+                if guild:
+                    guild_name = guild.name
+            except Exception:
+                pass
+            parts.append(f"### 📍 {guild_name}（ID: {guild_id}）\n\n{content}")
+
+    if not parts:
+        await interaction.followup.send("ℹ️ 所有伺服器目前皆無狙擊手天梯數據。")
+        return
+
+    combined = "\n---\n".join(parts)
+    # Discord 限制 2000 字，超出則分段發送
+    if len(combined) > 2000:
+        for i in range(0, len(combined), 1900):
+            await interaction.followup.send(combined[i:i+1900])
+    else:
+        await interaction.followup.send(combined)
 
 # ---- 權限錯誤處理 ----
 @bot.tree.error

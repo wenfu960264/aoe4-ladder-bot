@@ -1,0 +1,94 @@
+[2026-08-17 07:58:26] [INFO    ] discord.client: logging in using static token
+✅ 使用 Supabase 儲存資料
+ * Serving Flask app 'main'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://10.38.62.211:8080
+Press CTRL+C to quit
+[2026-08-17 07:58:32] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: b154f4c109abd9196ba0864fb218d1aa).
+Task exception was never retrieved
+future: <Task finished name='CommandTree-invoker' coro=<CommandTree._from_interaction.<locals>.wrapper() done, defined at C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\tree.py:1136> exception=HTTPException('400 Bad Request (error code: 40060): Interaction has already been acknowledged.')>
+Traceback (most recent call last):
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\commands.py", line 859, in _do_call
+    return await self._callback(interaction, **params)  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\wenfu\Desktop\aoe4-ladder-bot-main\main.py", line 402, in leaderboard
+    await interaction.response.defer()
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\interactions.py", line 858, in defer
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\webhook\async_.py", line 224, in request
+    raise NotFound(response, data)
+discord.errors.NotFound: 404 Not Found (error code: 10062): Unknown interaction
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\tree.py", line 1297, in _call
+    await command._invoke_with_namespace(interaction, namespace)
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\commands.py", line 884, in _invoke_with_namespace
+    return await self._do_call(interaction, transformed_values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\commands.py", line 877, in _do_call
+    raise CommandInvokeError(self, e) from e
+discord.app_commands.errors.CommandInvokeError: Command '天梯' raised an exception: NotFound: 404 Not Found (error code: 10062): Unknown interaction
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\tree.py", line 1138, in wrapper
+    await self._call(interaction)
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\tree.py", line 1301, in _call
+    await self.on_error(interaction, e)
+  File "C:\Users\wenfu\Desktop\aoe4-ladder-bot-main\main.py", line 491, in on_command_error
+    await interaction.response.send_message(
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\interactions.py", line 1051, in send_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 40060): Interaction has already been acknowledged.
+Task exception was never retrieved
+future: <Task finished name='CommandTree-invoker' coro=<CommandTree._from_interaction.<locals>.wrapper() done, defined at C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\tree.py:1136> exception=NotFound('404 Not Found (error code: 10062): Unknown interaction')>
+Traceback (most recent call last):
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\commands.py", line 859, in _do_call
+    return await self._callback(interaction, **params)  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\wenfu\Desktop\aoe4-ladder-bot-main\main.py", line 371, in sniper_list
+    await interaction.response.defer()
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\interactions.py", line 858, in defer
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\webhook\async_.py", line 224, in request
+    raise NotFound(response, data)
+discord.errors.NotFound: 404 Not Found (error code: 10062): Unknown interaction
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\tree.py", line 1297, in _call
+    await command._invoke_with_namespace(interaction, namespace)
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\commands.py", line 884, in _invoke_with_namespace
+    return await self._do_call(interaction, transformed_values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\commands.py", line 877, in _do_call
+    raise CommandInvokeError(self, e) from e
+discord.app_commands.errors.CommandInvokeError: Command '狙擊手列表' raised an exception: NotFound: 404 Not Found (error code: 10062): Unknown interaction
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\tree.py", line 1138, in wrapper
+    await self._call(interaction)
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\app_commands\tree.py", line 1301, in _call
+    await self.on_error(interaction, e)
+  File "C:\Users\wenfu\Desktop\aoe4-ladder-bot-main\main.py", line 491, in on_command_error
+    await interaction.response.send_message(
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\interactions.py", line 1051, in send_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\wenfu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\discord\webhook\async_.py", line 224, in request
+    raise NotFound(response, data)
+discord.errors.NotFound: 404 Not Found (error code: 10062): Unknown interaction
